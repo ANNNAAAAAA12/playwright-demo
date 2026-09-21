@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo de Playwright</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #f4f6f8; color: #1f2933; margin: 0; padding: 32px 16px; }
+    main { max-width: 820px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; }
+    p.sub { margin: 0 0 24px; color: #52606d; }
+    form { display: flex; gap: 8px; }
+    input { flex: 1; padding: 10px 12px; font-size: 16px; border: 1px solid #cbd2d9; border-radius: 6px; }
+    button { padding: 10px 18px; font-size: 16px; border: 0; border-radius: 6px; background: #2d8a4e; color: #fff; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #estado { margin: 16px 0; color: #52606d; }
+    #estado.error { color: #c0392b; }
+    .card { background: #fff; border-radius: 8px; padding: 16px 20px; margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .card h2 { margin: 0 0 8px; font-size: 16px; }
+    img { max-width: 100%; border: 1px solid #e4e7eb; border-radius: 6px; }
+    ul { margin: 0; padding-left: 20px; }
+    a { color: #1d6fb8; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Demo de Playwright</h1>
+  <p class="sub">Escribe una URL: el servidor abre un Chromium con Playwright, extrae datos y toma una captura.</p>
+
+  <form id="form">
+    <input id="url" value="https://example.com" placeholder="https://example.com" required>
+    <button id="btn">Ejecutar</button>
+  </form>
+  <div id="estado"></div>
+
+  <section id="resultado" hidden>
+    <div class="card">
+      <h2>Datos extraídos</h2>
+      <p><b>Título:</b> <span id="titulo"></span></p>
+      <p><b>Primer &lt;h1&gt;:</b> <span id="h1"></span></p>
+      <p><b>Tiempo:</b> <span id="ms"></span> ms</p>
+    </div>
+    <div class="card">
+      <h2>Primeros enlaces</h2>
+      <ul id="enlaces"></ul>
+    </div>
+    <div class="card">
+      <h2>Captura de pantalla</h2>
+      <img id="captura" alt="Captura de la página">
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  $('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('btn').disabled = true;
+    $('estado').className = '';
+    $('estado').textContent = 'Playwright está abriendo la página...';
+    $('resultado').hidden = true;
+
+    try {
+      const res = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: $('url').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      $('titulo').textContent = data.titulo || '(sin título)';
+      $('h1').textContent = data.h1 || '(no tiene)';
+      $('ms').textContent = data.ms;
+      $('enlaces').replaceChildren(...data.enlaces.map(l => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = l.href; a.target = '_blank'; a.textContent = l.texto || l.href;
+        li.append(a);
+        return li;
+      }));
+      $('captura').src = 'data:image/png;base64,' + data.captura;
+      $('estado').textContent = 'Listo: ' + data.url;
+      $('resultado').hidden = false;
+    } catch (err) {
+      $('estado').className = 'error';
+      $('estado').textContent = 'Error: ' + err.message;
+    } finally {
+      $('btn').disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
